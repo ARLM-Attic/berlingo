@@ -3,6 +3,7 @@ package berlingo
 import (
 	"errors"
 	"io"
+	"log"
 )
 
 // AI is the primary interface that must be implemented by an author to use the berlingo framework
@@ -14,6 +15,7 @@ type AI interface {
 }
 
 type Game struct {
+	Logger *log.Logger
 
 	// The AI implementation that will play the game
 	Ai AI
@@ -38,7 +40,7 @@ type Game struct {
 	Map *Map
 }
 
-func NewGame(ai AI, r io.Reader) (game *Game, err error) {
+func NewGame(ai AI, r io.Reader, logger *log.Logger) (game *Game, err error) {
 
 	request, err := NewRequest(r)
 	if err != nil {
@@ -51,6 +53,7 @@ func NewGame(ai AI, r io.Reader) (game *Game, err error) {
 	}
 
 	game = &Game{
+		Logger:                  logger,
 		Ai:                      ai,
 		Request:                 request,
 		Response:                response,

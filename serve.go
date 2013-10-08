@@ -16,9 +16,9 @@ var Logger = func(r *http.Request) *log.Logger {
 	return logger
 }
 
-func do(ai AI, r io.Reader) (response *Response, response_json []byte, err error) {
+func do(ai AI, r io.Reader, logger *log.Logger) (response *Response, response_json []byte, err error) {
 
-	game, err := NewGame(ai, r)
+	game, err := NewGame(ai, r, logger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -36,7 +36,8 @@ func do(ai AI, r io.Reader) (response *Response, response_json []byte, err error
 // Callback used to process an incoming HTTP request
 func serveHttpRequest(ai AI, w http.ResponseWriter, r *http.Request) {
 
-	Logger(r).Printf("HTTP: [%v] Processing %v %v", r.RemoteAddr, r.Method, r.RequestURI)
+	logger := Logger(r)
+	logger.Printf("HTTP: [%v] Processing %v %v", r.RemoteAddr, r.Method, r.RequestURI)
 	w.Header().Set("Content-Type", "application/json")
 
 	var input io.Reader
@@ -55,19 +56,19 @@ func serveHttpRequest(ai AI, w http.ResponseWriter, r *http.Request) {
 			}`
 		input = strings.NewReader(j)
 	default:
-		Logger(r).Printf("HTTP: Replying with error: Invalid request")
+		logger.Printf("HTTP: Replying with error: Invalid request")
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(`{"error": "Invalid request"}`))
 		return
 	}
 
-	_, response_json, err := do(ai, input)
+	_, response_json, err := do(ai, input, logger)
 	if err != nil {
-		Logger(r).Printf("HTTP: Responding with error: %+v\n", err)
+		logger.Printf("HTTP: Responding with error: %+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"error": "Internal server error"}`))
 	} else {
-		Logger(r).Printf("HTTP: Responding with moves\n")
+		logger.Printf("HTTP: Responding with moves\n")
 		w.Write(response_json)
 	}
 
@@ -82,7 +83,8 @@ func InitAppEngine(ai AI) {
 // ServeHttp serves the given AI over HTTP on the given port
 func ServeHttp(ai AI, port string) {
 
-	Logger(nil).Println("Starting HTTP server on port", port)
+	logger := Logger(nil)
+	logger.Println("Starting HTTP server on port", port)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		serveHttpRequest(ai, w, r)
@@ -90,7 +92,7 @@ func ServeHttp(ai AI, port string) {
 
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		Logger(nil).Println("HTTP Serving Error:", err)
+		logger.Println("HTTP Serving Error:", err)
 	}
 
 }
@@ -100,6 +102,7 @@ func ServeHttp(ai AI, port string) {
 // filename may be supplied as "-" to indicate STDIN
 func ServeFile(ai AI, filename string) {
 
+	logger := Logger(nil)
 	var fh *os.File
 	var err error
 
@@ -108,15 +111,15 @@ func ServeFile(ai AI, filename string) {
 	} else {
 		fh, err = os.Open(filename)
 		if err != nil {
-			Logger(nil).Println("Error opening", filename, ": ", err)
+			logger.Println("Error opening", filename, ": ", err)
 			return
 		}
 		defer fh.Close()
 	}
 
-	_, response_json, err := do(ai, fh)
+	_, response_json, err := do(ai, fh, logger)
 	if err != nil {
-		Logger(nil).Println("Error processing request:", err)
+		logger.Println("Error processing request:", err)
 		return
 	}
 	os.Stdout.Write(response_json)
